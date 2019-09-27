@@ -72,6 +72,8 @@ From the base directory, issue `mvn`
 
 This will download dependencies the first time and perhaps take longer.
 
+It will build the docker images in your local registry.
+
 ### Testing ###
 #### Spring Boot ####
 A normal build will run integration tests for each service against localstack, a local AWS infrastructure emulator

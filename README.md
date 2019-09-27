@@ -6,16 +6,17 @@ http://palindromes.quickcamel.com/swagger-ui.html
 
 ## Architecture ##
 This is the basic approach taken
+
+---
 * Submit palindrome problem
 * Persist the problem and status
 * Notify problem parser that there is a problem to solve
-* Respond to the user with a task reference, enabling them to query the status of their submission
-
-
-* Asynchronously, tasks to solve queue
+* Respond to the user with a task reference, enabling them to query the status of their submission  
+---
+* Asynchronously, submitted tasks proceed to a queue
 * Solve each and update the persisted status
 * User can poll the status at any point via GET requests
-
+---
 Cloud native makes sense for most APIs. I aimed for the service to be hosted in AWS, as the biggest cloud provider.
 I targeted ECS Fargate because it's easy, serverless and containers were mandated in the task outline.
 
@@ -58,6 +59,7 @@ via corporate POMs or any other organisation.
 I did put in a basic metric endpoints for a pull type scrape from Prometheus (which is why both services embed tomcat), 
 but did not go further or put in a proper health check API.
 
+---
 ## Building and Testing ##
 ### Prerequisites ###
 * Latest Docker

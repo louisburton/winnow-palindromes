@@ -1,0 +1,76 @@
+version: '3.7'
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - '4563-4599:4563-4599'
+      - '8055:8080'
+    environment:
+      - SERVICES=sqs,sns,dynamodb
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - './.localstack:/tmp/localstack'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    networks:
+      palindrome_network:
+        aliases:
+          - localstack
+  setup-resources:
+    image: mesosphere/aws-cli
+    container_name: setup_resources
+    environment:
+      - AWS_ACCESS_KEY_ID=dummyaccess
+      - AWS_SECRET_ACCESS_KEY=dummysecret
+      - AWS_DEFAULT_REGION=us-east-1
+    entrypoint: /bin/sh -c
+    command: >
+      "
+        sleep 10;
+        aws dynamodb create-table --endpoint-url=http://localstack:4569 --table-name palindrome_task \
+          --attribute-definitions AttributeName=task,AttributeType=S \
+          --key-schema AttributeName=task,KeyType=HASH \
+          --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1;
+        aws sns create-topic --endpoint-url=http://localstack:4575 --name palindrome-submitted;
+        aws sqs create-queue --endpoint-url=http://localstack:4576 --queue-name palindrome-service-queue;
+        aws sns subscribe --endpoint-url=http://localstack:4575 --topic-arn arn:aws:sns:us-east-1:000000000000:palindrome-submitted \
+          --protocol sqs --notification-endpoint arn:aws:sqs:us-east-1:000000000000:palindrome-service-queue
+      "
+    networks:
+      - palindrome_network
+    depends_on:
+      - localstack
+  palindrome-restendpoints:
+    image: 246689963846.dkr.ecr.eu-west-1.amazonaws.com/palindrome-restendpoints:1.0.0-SNAPSHOT
+    container_name: palindrome_restendpoints
+    ports:
+      - '80:80'
+      - '8180:8180'
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - PALINDROME_LOCALSTACK_DYNAMODB_ENDPOINT=http://localstack:4569/
+      - PALINDROME_LOCALSTACK_SNS_ENDPOINT=http://localstack:4575/
+    networks:
+      - palindrome_network
+    depends_on:
+      - localstack
+      - setup-resources
+  palindrome-service:
+    image: 246689963846.dkr.ecr.eu-west-1.amazonaws.com/palindrome-service:1.0.0-SNAPSHOT
+    container_name: palindrome_service
+    ports:
+      - '8081:8080'
+      - '8181:8180'
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - PALINDROME_LOCALSTACK_DYNAMODB_ENDPOINT=http://localstack:4569/
+      - PALINDROME_LOCALSTACK_SQS_ENDPOINT=http://localstack:4576/
+    networks:
+      - palindrome_network
+    depends_on:
+      - localstack
+      - setup-resources
+networks:
+  palindrome_network:
+    name: palindrome_network

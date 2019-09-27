@@ -1,0 +1,304 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy a service on AWS Fargate, hosted in a private subnet, but accessible via a public load balancer.
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: The name of the environment to add this service to
+  ServiceName:
+    Type: String
+    Description: A name for the service
+    Default: palindromes-service
+  RepositoryURI:
+    Type: String
+    Description: The url of a docker image that contains the application process that
+      will handle the traffic for this service
+    Default: 246689963846.dkr.ecr.eu-west-1.amazonaws.com/palindrome-service
+  PalindromesServiceImageTag:
+    Description: The image tag to be used by Palindromes RestEndpoints task definition
+    Type: String
+    MinLength: 1
+    MaxLength: 100
+    Default: 1.0.0-SNAPSHOT
+  ContainerPort:
+    Type: Number
+    Default: 8180
+    Description: What port number the application inside the docker container is binding to
+  ContainerCpu:
+    Type: Number
+    Default: 512
+    Description: How much CPU to give the container. 1024 is 1 CPU
+  ContainerMemory:
+    Type: Number
+    Default: 1024
+    Description: How much memory in megabytes to give the container
+  Path:
+    Type: String
+    Default: "*"
+    Description: A path on the load balancer that this service
+      should be connected to. Use * to send all load balancer
+      traffic to this service.
+  Priority:
+    Type: Number
+    Default: 1
+    Description: The priority for the routing rule added to the load balancer.
+      This only applies if your have multiple services which have been
+      assigned to different paths on the load balancer.
+  DesiredCount:
+    Type: Number
+    Default: 2
+    Description: How many copies of the service task to run
+
+
+Resources:
+  PalindromesServiceQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: palindrome-service-queue
+      VisibilityTimeout: 240
+  PalindromesServiceQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref PalindromesServiceQueue
+      PolicyDocument:
+        Version: 2012-10-17
+        Id: PalindromesServiceQueuePolicy
+        Statement:
+          - Sid: Allow SendMessage to PalindromeServiceQueue from PalindromeSubmittedTopic
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: SQS:SendMessage
+            Resource: '*'
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  Fn::ImportValue: !Sub ${EnvironmentName}:PalindromeSubmittedARN
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      Policies:
+        - PolicyName: AllowTaskToWorkWithSQS
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:ListQueues
+                  - sqs:GetQueueUrl
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !Sub 'arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*'
+        - PolicyName: AllowTaskToWorkWithDynamoDB
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource:
+                  - arn:aws:dynamodb:*:*:table/palindrome_task
+
+  # A log group for storing the stdout logs from this service's containers
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub ${EnvironmentName}-service-${ServiceName}
+
+  # The task definition. This is a simple metadata description of what
+  # container to run, and what resource requirements it has.
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref 'ServiceName'
+      Cpu: !Ref 'ContainerCpu'
+      Memory: !Ref 'ContainerMemory'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn:
+        Fn::ImportValue: !Sub ${EnvironmentName}:ECSTaskExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: !Ref 'ServiceName'
+          Cpu: !Ref 'ContainerCpu'
+          Memory: !Ref 'ContainerMemory'
+          Image: !Join
+            - ''
+            - - !Ref RepositoryURI
+              - ':'
+              - !Ref PalindromesServiceImageTag
+          PortMappings:
+            - ContainerPort: !Ref 'ContainerPort'
+          LogConfiguration:
+            LogDriver: 'awslogs'
+            Options:
+              awslogs-group: !Sub ${EnvironmentName}-service-${ServiceName}
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: !Ref 'ServiceName'
+
+  # The service. The service is a resource which allows you to run multiple
+  # copies of a type of task, and gather up their logs and metrics, as well
+  # as monitor the number of running tasks and replace any that have crashed
+  PalindromesParsingService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Fn::ImportValue: !Sub ${EnvironmentName}:ClusterName
+      LaunchType: FARGATE
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      DesiredCount: !Ref 'DesiredCount'
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - Fn::ImportValue: !Sub ${EnvironmentName}:ContainerSecurityGroup
+          Subnets:
+            - Fn::ImportValue: !Sub ${EnvironmentName}:PrivateSubnetOne
+            - Fn::ImportValue: !Sub ${EnvironmentName}:PrivateSubnetTwo
+      TaskDefinition: !Ref 'TaskDefinition'
+
+  PalindromesServiceAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+      Policies:
+        - PolicyName: AllowAutoScaling
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - application-autoscaling:*
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:PutMetricAlarm
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: '*'
+  PalindromesServiceScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 10
+      MinCapacity: 0
+      ResourceId:
+        Fn::Join:
+          - '/'
+          - - service
+            - Fn::ImportValue: !Sub ${EnvironmentName}:ClusterName
+            - !GetAtt PalindromesParsingService.Name
+      RoleARN: !GetAtt PalindromesServiceAutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+  PalindromesServiceScaleUp:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: PalindromesServicePolicyUp
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref PalindromesServiceScalableTarget
+      StepScalingPolicyConfiguration:
+        Cooldown: 60
+        AdjustmentType: ChangeInCapacity
+        StepAdjustments:
+          - MetricIntervalLowerBound: 0
+            MetricIntervalUpperBound: 2
+            ScalingAdjustment: 1
+          - MetricIntervalLowerBound: 2
+            MetricIntervalUpperBound: 10
+            ScalingAdjustment: 2
+          - MetricIntervalLowerBound: 10
+            MetricIntervalUpperBound: 50
+            ScalingAdjustment: 5
+          - MetricIntervalLowerBound: 50
+            ScalingAdjustment: 10
+  PalindromesServiceScaleDown:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: PalindromesServicePolicyDown
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref PalindromesServiceScalableTarget
+      StepScalingPolicyConfiguration:
+        Cooldown: 60
+        AdjustmentType: PercentChangeInCapacity
+        StepAdjustments:
+          - MetricIntervalLowerBound: 0
+            MetricIntervalUpperBound: 60
+            ScalingAdjustment: -35
+          - MetricIntervalLowerBound: 60
+            ScalingAdjustment: -50
+#  PalindromesServiceScaleOff:
+#    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+#    Properties:
+#      PolicyName: PalindromesServicePolicyOff
+#      PolicyType: StepScaling
+#      ScalingTargetId: !Ref PalindromesServiceScalableTarget
+#      StepScalingPolicyConfiguration:
+#        Cooldown: 60
+#        AdjustmentType: ExactCapacity
+#        StepAdjustments:
+#          - MetricIntervalLowerBound: 0
+#            ScalingAdjustment: 0
+  PalindromesServiceIdleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Trigger scaling back based on idle PalindromesServices
+      Namespace: AWS/SQS
+      MetricName: NumberOfEmptyReceives
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt PalindromesServiceQueue.QueueName
+      EvaluationPeriods: 3
+      Period: 300
+      Statistic: Sum
+      Threshold: 40
+      AlarmActions:
+        - !Ref PalindromesServiceScaleDown
+#  PalindromesServiceSQSDormantAlarm:
+#    Type: AWS::CloudWatch::Alarm
+#    Properties:
+#      AlarmDescription: Trigger scaling to turn PalindromesService SQS to zero if no messages received in 6 hours
+#      Namespace: AWS/SQS
+#      MetricName: NumberOfMessagesSent
+#      ComparisonOperator: LessThanOrEqualToThreshold
+#      Dimensions:
+#        - Name: QueueName
+#          Value: !GetAtt PalindromesServiceQueue.QueueName
+#      EvaluationPeriods: 6
+#      Period: 3600
+#      Statistic: Sum
+#      Threshold: 0
+#      AlarmActions:
+#        - !Ref PalindromesServiceScaleOff
+  PalindromesServiceSQSActivityAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Trigger scaling up of PalindromesService as the queue grows
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt PalindromesServiceQueue.QueueName
+      EvaluationPeriods: 1
+      Period: 300
+      Statistic: Sum
+      Threshold: 0
+      AlarmActions:
+        - !Ref PalindromesServiceScaleUp

@@ -1,4 +1,4 @@
-image: openjdk:11-jdk
+image: openjdk:11-jdk-slim
 
 variables:
   REVISION: $CI_PIPELINE_ID
@@ -9,8 +9,9 @@ services:
   - docker:dind
 
 before_script:
-  - apk add --no-cache curl jq python py-pip
-  - pip install awscli
+  - sudo apt update
+  - sudo apt install python3-pip
+  - pip3 install --upgrade --user awscli
 
 stages:
   - test_and_deploy

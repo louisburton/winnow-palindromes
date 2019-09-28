@@ -13,11 +13,10 @@ before_script:
   - pip install awscli
 
 stages:
-  - test & deploy
+  - test_deploy
 
-
-build:
-  stage: build
+test_deploy:
+  stage: test_deploy
   script:
     - $(aws ecr get-login --no-include-email --region eu-west-1)
     - ./mvnw deploy

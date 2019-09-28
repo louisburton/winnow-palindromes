@@ -12,6 +12,7 @@ before_script:
   - apt update
   - apt install -y python3-pip
   - pip3 install --upgrade --user awscli
+  - export PATH=root/.local/bin:$PATH
 
 stages:
   - test_and_deploy

@@ -12,7 +12,6 @@ before_script:
   - apt update
   - apt install -y python3-pip
   - pip3 install --upgrade --user awscli
-  - export PATH=root/.local/bin:$PATH
 
 stages:
   - test_and_deploy
@@ -20,7 +19,8 @@ stages:
 test_and_deploy:
   stage: test_and_deploy
   script:
-    - $(aws ecr get-login --no-include-email --region eu-west-1)
+    - export PATH=root/.local/bin:$PATH
+    - $(root/.local/bin/aws ecr get-login --no-include-email --region eu-west-1)
     - ./mvnw deploy
   only:
     - master

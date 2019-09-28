@@ -12,7 +12,7 @@ before_script:
   - apt-get update
   - apt-get install -y python3-pip
   - pip3 install --upgrade --user awscli
-  - apt-get install docker.io
+  - apt-get install -y docker.io
 
 stages:
   - test_and_deploy

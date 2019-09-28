@@ -54,7 +54,7 @@ I've not tuned actual scaling rules, polling configurations, redrive policies, e
 that you might expect with a production worthy service.
 
 I have not formulated a proper release strategy, nor have sensibly consolidated any Maven configuration redundancy 
-via corporate POMs or any other organisation.
+via corporate POMs or any other organisation. _I attempted basic CI/CD in Gitlab CI, but this currently isn't working_.
 
 I did put in a basic metric endpoints for a pull type scrape from Prometheus (which is why both services embed tomcat), 
 but did not go further or put in a proper health check API.

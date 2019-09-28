@@ -9,12 +9,10 @@ services:
   - docker:dind
 
 before_script:
-  - apt update
-  - apt install -y python3-pip
+  - apt-get update
+  - apt-get install -y python3-pip
   - pip3 install --upgrade --user awscli
-  - find ./ -name aws
-  - export PATH=~/.local/bin:$PATH
-  - whoami
+  - apt-get install docker.io
 
 stages:
   - test_and_deploy
@@ -22,10 +20,6 @@ stages:
 test_and_deploy:
   stage: test_and_deploy
   script:
-    - whoami
-    - find / -name aws
-    - ls ~/.local/bin
-    - ls /home
     - export PATH=/root/.local/bin:$PATH
     - aws --version
     - $(aws ecr get-login --no-include-email --region eu-west-1)

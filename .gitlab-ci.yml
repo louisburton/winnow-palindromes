@@ -9,8 +9,8 @@ services:
   - docker:dind
 
 before_script:
-  - sudo apt update
-  - sudo apt install python3-pip
+  - apt update
+  - apt install python3-pip
   - pip3 install --upgrade --user awscli
 
 stages:

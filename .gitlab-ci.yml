@@ -15,14 +15,22 @@ before_script:
   - apt-get install -y docker.io
 
 stages:
-  - test_and_deploy
+  - test_and_ecr_deploy
+  - cloudformation_update
 
-test_and_deploy:
-  stage: test_and_deploy
+test_and_ecr_deploy:
+  stage: test_and_ecr_deploy
   script:
     - export PATH=/root/.local/bin:$PATH
     - aws --version
     - $(aws ecr get-login --no-include-email --region eu-west-1)
     - ./mvnw deploy
+  only:
+    - master
+cloudformation_update:
+  stage: cloudformation_update
+  script:
+    - aws cloudformation update-stack --stack-name winnow-palindrome-restendpoints --template-body file://palindromes-infrastructure/palindromes-restendpoints.cfn.yaml --parameters ParameterKey=EnvironmentName,ParameterValue=winnow ParameterKey=PalindromesRestEndpointsImageTag,ParameterValue=1.0.$CI_PIPELINE_ID --capabilities CAPABILITY_IAM
+    - aws cloudformation update-stack --stack-name winnow-palindrome-service --template-body file://palindromes-infrastructure/palindromes-service.cfn.yaml --parameters ParameterKey=EnvironmentName,ParameterValue=winnow ParameterKey=PalindromesServiceImageTag,ParameterValue=1.0.$CI_PIPELINE_ID --capabilities CAPABILITY_IAM
   only:
     - master

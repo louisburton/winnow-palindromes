@@ -1,6 +1,6 @@
 # Winnow Palindromes #
 
-![Gitlab pipeline status](https://img.shields.io/gitlab/pipeline/louis.burton/winnow-palindromes?style=for-the-badge)
+[![Gitlab pipeline status](https://img.shields.io/gitlab/pipeline/louis.burton/winnow-palindromes?style=for-the-badge)](https://gitlab.com/louis.burton/winnow-palindromes/pipelines)
 
 Supporting wordsmiths in finding long palindromes
 

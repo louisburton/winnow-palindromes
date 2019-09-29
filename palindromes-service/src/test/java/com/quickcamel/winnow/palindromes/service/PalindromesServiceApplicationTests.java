@@ -21,8 +21,12 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cloud.aws.messaging.config.SimpleMessageListenerContainerFactory;
 import org.springframework.context.annotation.*;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,6 +94,7 @@ class PalindromesServiceApplicationTests {
                 .build();
 
         serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
+        serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
 
         dynamoDB = AmazonDynamoDBAsyncClientBuilder
                 .standard()
@@ -133,5 +138,16 @@ class PalindromesServiceApplicationTests {
         PalindromeTaskEntity entity = palindromeTaskRepository.findById(taskId).orElseThrow();
         assertThat(entity.getStatus()).isEqualTo(PalindromeTaskEntity.Status.COMPLETED);
         assertThat(entity.getLargestPalindromeLength()).isNotNull();
+    }
+
+    private static String getContainerAddress() {
+        final String address = DockerClientFactory.instance().dockerHostIpAddress();
+        String ipAddress = address;
+        try {
+            // resolve IP address and use that as the endpoint so that path-style access is automatically used for S3
+            ipAddress = InetAddress.getByName(address).getHostAddress();
+        } catch (UnknownHostException ignored) {
+        }
+        return ipAddress;
     }
 }

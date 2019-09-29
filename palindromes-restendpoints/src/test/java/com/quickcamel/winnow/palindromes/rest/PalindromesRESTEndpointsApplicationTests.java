@@ -133,8 +133,6 @@ public class PalindromesRESTEndpointsApplicationTests {
         assertionQueueURL = sqs.createQueue(QUEUE_NAME).getQueueUrl();
         submitTopicARN = sns.createTopic(TOPIC_NAME).getTopicArn();
         assertionQueueURL = assertionQueueURL.replace("localhost", getContainerAddress());
-        System.out.println("!!! -" + localStack.getEndpointConfiguration(SQS).getServiceEndpoint());
-        System.out.println("!!! -" + assertionQueueURL);
         String queueARN = sqs.getQueueAttributes(assertionQueueURL, Collections.singletonList("QueueArn"))
                 .getAttributes().get("QueueArn");
         sns.subscribe(submitTopicARN, "sqs", queueARN);

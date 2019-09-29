@@ -15,6 +15,8 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -36,6 +38,8 @@ import static org.testcontainers.containers.localstack.LocalStackContainer.Servi
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PalindromesServiceApplicationTests {
+
+    private static final Logger logger = LoggerFactory.getLogger(PalindromesServiceApplicationTests.class);
 
     @Container
     private static final LocalStackContainer localStack = new LocalStackContainer()
@@ -93,6 +97,11 @@ class PalindromesServiceApplicationTests {
                 .withClientConfiguration(new ClientConfiguration().withSocketTimeout(2000))
                 .build();
 
+        awaitLocalstackReady(sqs);
+
+        serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
+        serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
+
         dynamoDB = AmazonDynamoDBAsyncClientBuilder
                 .standard()
                 .withEndpointConfiguration(localStack.getEndpointConfiguration(DYNAMODB))
@@ -105,9 +114,6 @@ class PalindromesServiceApplicationTests {
         tableRequest.setProvisionedThroughput(new ProvisionedThroughput(1L, 1L));
 
         TableUtils.createTableIfNotExists(dynamoDB, tableRequest);
-
-        serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
-        serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
     }
 
     @Test
@@ -149,5 +155,27 @@ class PalindromesServiceApplicationTests {
         } catch (UnknownHostException ignored) {
         }
         return ipAddress;
+    }
+
+    private static void awaitLocalstackReady(AmazonSQSAsync amazonSQS) {
+        int retries = 0;
+        while (true) {
+            try {
+                if (retries++ > 120) {
+                    logger.info("Aborting localstack wait");
+                    break;
+                }
+                amazonSQS.listQueues();
+                break;
+            } catch (final Exception ignored) {
+                try {
+                    logger.info("Waiting for SQS to be ready - localstack compromise");
+                    Thread.sleep(500);
+                } catch (final InterruptedException e) {
+                    e.printStackTrace();
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
     }
 }

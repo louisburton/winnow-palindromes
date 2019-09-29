@@ -100,7 +100,10 @@ class PalindromesServiceApplicationTests {
         awaitLocalstackReady(sqs);
 
         serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
+        System.out.println("!!! - " + serviceQueueUrl);
         serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
+        System.out.println("!!! - " + serviceQueueUrl);
+        System.out.println("!!! - " + System.getenv("HOSTNAME_EXTERNAL"));
 
         dynamoDB = AmazonDynamoDBAsyncClientBuilder
                 .standard()

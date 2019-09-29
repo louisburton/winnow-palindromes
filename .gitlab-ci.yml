@@ -1,24 +1,20 @@
-image: openjdk:11-jdk-slim
-
-variables:
-  DOCKER_HOST: tcp://docker:2375
-
-services:
-  - docker:dind
-
-before_script:
-  - apt-get update
-  - apt-get install -y python3-pip
-  - pip3 install --upgrade --user awscli
-  - apt-get install -y docker.io
-  - export PATH=/root/.local/bin:$PATH
-
 stages:
   - test_and_ecr_deploy
   - cloudformation_update
 
 test_and_ecr_deploy:
+  image: openjdk:11-jdk-slim
   stage: test_and_ecr_deploy
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  services:
+    - docker:dind
+  before_script:
+    - apt-get update
+    - apt-get install -y python3-pip
+    - pip3 install --upgrade --user awscli
+    - apt-get install -y docker.io
+    - export PATH=/root/.local/bin:$PATH
   script:
     - aws --version
     - $(aws ecr get-login --no-include-email --region eu-west-1)
@@ -26,9 +22,11 @@ test_and_ecr_deploy:
   only:
     - master
 cloudformation_update:
+  image: python:latest
   stage: cloudformation_update
   script:
-    - aws cloudformation update-stack --stack-name winnow-palindrome-restendpoints --template-body file://palindromes-infrastructure/palindromes-restendpoints.cfn.yaml --parameters ParameterKey=EnvironmentName,ParameterValue=winnow ParameterKey=PalindromesRestEndpointsImageTag,ParameterValue=1.0.$CI_PIPELINE_ID --capabilities CAPABILITY_IAM
-    - aws cloudformation update-stack --stack-name winnow-palindrome-service --template-body file://palindromes-infrastructure/palindromes-service.cfn.yaml --parameters ParameterKey=EnvironmentName,ParameterValue=winnow ParameterKey=PalindromesServiceImageTag,ParameterValue=1.0.$CI_PIPELINE_ID --capabilities CAPABILITY_IAM
+    - pip install awscli
+    - aws cloudformation update-stack --region eu-west-1 --stack-name winnow-palindrome-restendpoints --template-body file://palindromes-infrastructure/palindromes-restendpoints.cfn.yaml --parameters ParameterKey=EnvironmentName,ParameterValue=winnow ParameterKey=PalindromesRestEndpointsImageTag,ParameterValue=1.0.$CI_PIPELINE_ID --capabilities CAPABILITY_IAM
+    - aws cloudformation update-stack --region eu-west-1 --stack-name winnow-palindrome-service --template-body file://palindromes-infrastructure/palindromes-service.cfn.yaml --parameters ParameterKey=EnvironmentName,ParameterValue=winnow ParameterKey=PalindromesServiceImageTag,ParameterValue=1.0.$CI_PIPELINE_ID --capabilities CAPABILITY_IAM
   only:
     - master

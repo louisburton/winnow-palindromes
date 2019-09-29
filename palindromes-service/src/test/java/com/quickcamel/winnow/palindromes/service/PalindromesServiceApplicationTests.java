@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.cloud.aws.core.env.ResourceIdResolver;
 import org.springframework.cloud.aws.messaging.config.SimpleMessageListenerContainerFactory;
 import org.springframework.context.annotation.*;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -85,6 +86,13 @@ class PalindromesServiceApplicationTests {
             simpleMessageListenerContainerFactory.setMaxNumberOfMessages(1);
             return simpleMessageListenerContainerFactory;
         }
+
+        @Bean
+        @SuppressWarnings("unused")
+        public ResourceIdResolver resourceIdResolver() {
+            return logicalResourceId -> localStack.getEndpointConfiguration(SQS).getServiceEndpoint()
+                    + "/queue/" + logicalResourceId;
+        }
     }
 
     @BeforeAll
@@ -100,10 +108,7 @@ class PalindromesServiceApplicationTests {
         awaitLocalstackReady(sqs);
 
         serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
-        System.out.println("!!! - " + serviceQueueUrl);
         serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
-        System.out.println("!!! - " + serviceQueueUrl);
-        System.out.println("!!! - " + System.getenv("HOSTNAME_EXTERNAL"));
 
         dynamoDB = AmazonDynamoDBAsyncClientBuilder
                 .standard()

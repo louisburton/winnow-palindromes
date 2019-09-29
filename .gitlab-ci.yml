@@ -3,11 +3,9 @@ image: openjdk:11-jdk-slim
 variables:
   REVISION: $CI_PIPELINE_ID
   DOCKER_HOST: tcp://docker:2375
-  HOSTNAME_EXTERNAL: buildhost
 
 services:
-  - name: docker:dind
-    alias: buildhost
+  - docker:dind
 
 before_script:
   - apt-get update

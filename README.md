@@ -1,5 +1,7 @@
 # Winnow Palindromes #
 
+![Gitlab pipeline status](https://img.shields.io/gitlab/pipeline/louis.burton/winnow-palindromes?style=for-the-badge)
+
 Supporting wordsmiths in finding long palindromes
 
 http://palindromes.quickcamel.com/swagger-ui.html
@@ -31,8 +33,11 @@ of kinesis/kafka.
 
 I used Spring and Java to do it quicker, even if with verbosity/weight.
 
-Containers were required, but if I had more time I would have liked to try to do it with Lambda's, 
-using DynamoDB streams to automatically trigger a lambda to process the job rather than need separate notification.
+GitLab CI is used to deliver each change into the live system. This is free & powerful, 
+although did pose complications due to the use of docker to do the builds (which in turn run docker images, and build new ones).
+
+Containers were required, but if I had more time I would have liked to attempt it with Lambda's.
+Using DynamoDB streams would automatically trigger a lambda to process the job rather than requiring separate notification.
 
 ## Shortcuts ##
 
@@ -53,8 +58,7 @@ I've not spent time streamlining this.
 I've not tuned actual scaling rules, polling configurations, redrive policies, etc. 
 that you might expect with a production worthy service.
 
-I have not formulated a proper release strategy, nor have sensibly consolidated any Maven configuration redundancy 
-via corporate POMs or any other organisation. _I attempted basic CI/CD in Gitlab CI, but this currently isn't working_.
+I have not consolidated any Maven configuration redundancy via corporate POMs or any other organisation.
 
 I did put in a basic metric endpoints for a pull type scrape from Prometheus (which is why both services embed tomcat), 
 but did not go further or put in a proper health check API.

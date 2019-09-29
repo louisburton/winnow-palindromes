@@ -3,6 +3,7 @@ image: openjdk:11-jdk-slim
 variables:
   REVISION: $CI_PIPELINE_ID
   DOCKER_HOST: tcp://docker:2375
+  DEBUG=sqs
 
 services:
   - docker:dind

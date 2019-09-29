@@ -146,6 +146,9 @@
                         <systemPropertyVariables>
                             <aws.region>us-east-1</aws.region>
                         </systemPropertyVariables>
+                        <environmentVariables>
+                            <DEBUG>sqs</DEBUG>
+                        </environmentVariables>
                     </configuration>
                 </plugin>
             </plugins>

@@ -93,9 +93,6 @@ class PalindromesServiceApplicationTests {
                 .withClientConfiguration(new ClientConfiguration().withSocketTimeout(2000))
                 .build();
 
-        serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
-        serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
-
         dynamoDB = AmazonDynamoDBAsyncClientBuilder
                 .standard()
                 .withEndpointConfiguration(localStack.getEndpointConfiguration(DYNAMODB))
@@ -108,6 +105,9 @@ class PalindromesServiceApplicationTests {
         tableRequest.setProvisionedThroughput(new ProvisionedThroughput(1L, 1L));
 
         TableUtils.createTableIfNotExists(dynamoDB, tableRequest);
+
+        serviceQueueUrl = sqs.createQueue("palindrome-service-queue").getQueueUrl();
+        serviceQueueUrl = serviceQueueUrl.replace("localhost", getContainerAddress());
     }
 
     @Test

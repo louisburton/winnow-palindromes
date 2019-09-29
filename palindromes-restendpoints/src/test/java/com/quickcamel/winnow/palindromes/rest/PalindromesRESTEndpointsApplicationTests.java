@@ -129,7 +129,7 @@ public class PalindromesRESTEndpointsApplicationTests {
         // Create queue and subscribe to topic to assert topic delivery
         assertionQueueURL = sqs.createQueue(QUEUE_NAME).getQueueUrl();
         submitTopicARN = sns.createTopic(TOPIC_NAME).getTopicArn();
-        System.out.println("!!! -" + localStack.getEndpointConfiguration(SQS));
+        System.out.println("!!! -" + localStack.getEndpointConfiguration(SQS).getServiceEndpoint());
         System.out.println("!!! -" + assertionQueueURL);
         String queueARN = sqs.getQueueAttributes(assertionQueueURL, Collections.singletonList("QueueArn"))
                 .getAttributes().get("QueueArn");

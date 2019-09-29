@@ -32,10 +32,13 @@ import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.context.annotation.*;
 import org.springframework.http.*;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Optional;
@@ -129,6 +132,7 @@ public class PalindromesRESTEndpointsApplicationTests {
         // Create queue and subscribe to topic to assert topic delivery
         assertionQueueURL = sqs.createQueue(QUEUE_NAME).getQueueUrl();
         submitTopicARN = sns.createTopic(TOPIC_NAME).getTopicArn();
+        assertionQueueURL = assertionQueueURL.replace("localhost", getContainerAddress());
         System.out.println("!!! -" + localStack.getEndpointConfiguration(SQS).getServiceEndpoint());
         System.out.println("!!! -" + assertionQueueURL);
         String queueARN = sqs.getQueueAttributes(assertionQueueURL, Collections.singletonList("QueueArn"))
@@ -299,5 +303,16 @@ public class PalindromesRESTEndpointsApplicationTests {
         ObjectMapper objectMapper = new ObjectMapper();
         return objectMapper.readTree(sqsJson)
                 .get("Message").textValue();
+    }
+
+    private String getContainerAddress() {
+        final String address = DockerClientFactory.instance().dockerHostIpAddress();
+        String ipAddress = address;
+        try {
+            // resolve IP address and use that as the endpoint so that path-style access is automatically used for S3
+            ipAddress = InetAddress.getByName(address).getHostAddress();
+        } catch (UnknownHostException ignored) {
+        }
+        return ipAddress;
     }
 }
